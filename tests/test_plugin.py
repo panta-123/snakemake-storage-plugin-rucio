@@ -60,6 +60,8 @@ SITE_CONFIG = _load_site_config()
     ("query", "expected"),
     [
         ("rucio://test:file1.txt", True),
+        ("rucio://test:/file1.txt", True),
+        ("rucio://test:/my/path/file1.txt", True),
         ("rucio:/test:file1.txt", False),
         ("/test:file1.txt", False),
         ("test:file1.txt", False),

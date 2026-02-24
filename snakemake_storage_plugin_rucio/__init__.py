@@ -160,9 +160,9 @@ class StorageProvider(StorageProviderBase):
         """Return example queries with description for this storage provider."""
         return [
             ExampleQuery(
-                query="rucio://myscope:myname",
+                query="rucio://myscope:myname/file.txt",
                 type=QueryType.ANY,
-                description='The file associated to did myscope:myname.',
+                description='The file associated to did myscope:myname/file.txt.',
             ),
         ]
 
@@ -202,13 +202,13 @@ class StorageProvider(StorageProviderBase):
                 reason=f"cannot be parsed as URL ({exc})",
             )
 
-        if parsed.scheme == "rucio" and ":" in parsed.netloc and not parsed.path:
-            # Only rucio://scope:name is accepted
+        if parsed.scheme == "rucio" and (":" in parsed.netloc or (parsed.path and parsed.path.startswith(":"))):
+            # rucio://scope:name or rucio://scope:/name is accepted
             return StorageQueryValidationResult(
                 query=query,
                 valid=True,
             )
-        elif parsed.scheme and parsed.netloc:
+        elif parsed.scheme and parsed.netloc and parsed.scheme != "rucio":
             # Accept any valid URL, to be used when retrieve=False.
             return StorageQueryValidationResult(
                 query=query,
@@ -218,7 +218,7 @@ class StorageProvider(StorageProviderBase):
         return StorageQueryValidationResult(
             query=query,
             valid=False,
-            reason="must be of the form rucio://scope:name",
+            reason="must be of the form rucio://scope:name or rucio://scope:/name",
         )
 
 
@@ -236,8 +236,12 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
             raise ValueError(self.query)
         parsed = urlparse(self.query)
         if parsed.scheme == "rucio":
-            # Only rucio://scope:name is accepted
-            self.scope, self.file = parsed.netloc.split(":", 1)
+            # rucio://scope:name or rucio://scope:/name is accepted
+            full_did = parsed.netloc + parsed.path
+            if ":" in full_did:
+                self.scope, self.file = full_did.split(":", 1)
+                if not self.scope or not self.file:
+                    raise ValueError(f"Invalid Rucio DID: {full_did}. Scope and Name are required.")
         else:
             # When retrieve=False, the query is set to a URL and there is no
             # way to extract the scope and file from it.
