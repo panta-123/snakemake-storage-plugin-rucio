@@ -160,9 +160,9 @@ class StorageProvider(StorageProviderBase):
         """Return example queries with description for this storage provider."""
         return [
             ExampleQuery(
-                query="rucio://myscope/myfile.txt",
+                query="rucio://myscope:myname",
                 type=QueryType.ANY,
-                description='The file "myfile.txt" in Rucio scope "myscope".',
+                description='The file associated to did myscope:myname.',
             ),
         ]
 
@@ -202,20 +202,12 @@ class StorageProvider(StorageProviderBase):
                 reason=f"cannot be parsed as URL ({exc})",
             )
 
-        if parsed.scheme in ("rucio", ""):
-            # Acceptable forms:
-            # - rucio://scope/file
-            # - rucio:/scope/file
-            # - /scope/file
-            # - scope/file
-            path_elements = [p for p in parsed.path.strip("/").split("/") if p]
-            if (bool(parsed.netloc) and len(path_elements) == 1) or (
-                not parsed.netloc and len(path_elements) == 2  # noqa: PLR2004
-            ):
-                return StorageQueryValidationResult(
-                    query=query,
-                    valid=True,
-                )
+        if parsed.scheme == "rucio" and ":" in parsed.netloc and not parsed.path:
+            # Only rucio://scope:name is accepted
+            return StorageQueryValidationResult(
+                query=query,
+                valid=True,
+            )
         elif parsed.scheme and parsed.netloc:
             # Accept any valid URL, to be used when retrieve=False.
             return StorageQueryValidationResult(
@@ -226,7 +218,7 @@ class StorageProvider(StorageProviderBase):
         return StorageQueryValidationResult(
             query=query,
             valid=False,
-            reason="must be of the form rucio://scope/file",
+            reason="must be of the form rucio://scope:name",
         )
 
 
@@ -243,18 +235,9 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
         if not self.is_valid_query():
             raise ValueError(self.query)
         parsed = urlparse(self.query)
-        if parsed.scheme in ("rucio", ""):
-            # Acceptable forms:
-            # - rucio://scope/file
-            # - rucio:/scope/file
-            # - /scope/file
-            # - scope/file
-            path_elements = parsed.path.lstrip("/").split("/")
-            if parsed.netloc:
-                self.scope = parsed.netloc
-                self.file = path_elements[0]
-            else:
-                self.scope, self.file = path_elements
+        if parsed.scheme == "rucio":
+            # Only rucio://scope:name is accepted
+            self.scope, self.file = parsed.netloc.split(":", 1)
         else:
             # When retrieve=False, the query is set to a URL and there is no
             # way to extract the scope and file from it.
@@ -407,7 +390,7 @@ class StorageObject(StorageObjectRead, StorageObjectWrite, StorageObjectGlob):
     def store_object(self) -> None:
         """Upload the file."""
         if self.exists():
-            msg = f'File "{self.scope}/{self.file}" already exists on Rucio'
+            msg = f'File "{self.scope}:{self.file}" already exists on Rucio'
             raise ValueError(msg)
         if self.provider.settings.upload_rse is None:
             msg = "Please specify the `upload_rse`."

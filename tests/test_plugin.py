@@ -59,10 +59,10 @@ SITE_CONFIG = _load_site_config()
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
-        ("rucio://test/file1.txt", True),
-        ("rucio:/test/file1.txt", True),
-        ("/scope/file1.txt", True),
-        ("scope/file1.txt", True),
+        ("rucio://test:file1.txt", True),
+        ("rucio:/test:file1.txt", False),
+        ("/test:file1.txt", False),
+        ("test:file1.txt", False),
         ("root://xrd1:1094//rucio/test/7c/69/file1.txt", True),
         ("x:/y/z", False),
         ("rucio://scope", False),
@@ -130,11 +130,11 @@ class TestStorageNoRetrieve(TestStorageRucioBase):
         """Return a query."""
         # If retrieve_only is True, this should be a query that
         # is present in the storage, as it will not be created.
-        return f"rucio://{SITE_CONFIG['scope']}/{SITE_CONFIG['file']}"
+        return f"rucio://{SITE_CONFIG['scope']}:{SITE_CONFIG['file']}"
 
     def get_query_not_existing(self, tmp_path: Path) -> str:  # noqa: ARG002
         """Return a query that is not present in the storage."""
-        return f"rucio://{SITE_CONFIG['scope']}/abc.txt"
+        return f"rucio://{SITE_CONFIG['scope']}:abc.txt"
 
     def test_storage(self, tmp_path: Path) -> None:
         """Override the test_storage method to test just getting the URL."""
@@ -174,11 +174,11 @@ class TestStorageRead(TestStorageRucioBase):
         """Return a query."""
         # If retrieve_only is True, this should be a query that
         # is present in the storage, as it will not be created.
-        return f"rucio://{SITE_CONFIG['scope']}/{SITE_CONFIG['file']}"
+        return f"rucio://{SITE_CONFIG['scope']}:{SITE_CONFIG['file']}"
 
     def get_query_not_existing(self, tmp_path: Path) -> str:  # noqa: ARG002
         """Return a query that is not present in the storage."""
-        return f"rucio://{SITE_CONFIG['scope']}/abc.txt"
+        return f"rucio://{SITE_CONFIG['scope']}:abc.txt"
 
 
 class TestStorageReadWithScopeCache(TestStorageRead):
@@ -210,19 +210,19 @@ class TestStorageWrite(TestStorageRucioBase):
     def get_query(self, tmp_path: Path) -> str:  # noqa: ARG002
         """Return a query for a new file with a unique name."""
         file = f"snakemake-storage-plugin-test-{datetime.now(UTC):%Y%m%dT%H%M%S%f}.txt"
-        return f"rucio://{SITE_CONFIG['scope']}/{file}"
+        return f"rucio://{SITE_CONFIG['scope']}:{file}"
 
     def get_query_not_existing(self, tmp_path: Path) -> str:  # noqa: ARG002
         """Return a query that is not present in the storage."""
-        return f"rucio://{SITE_CONFIG['scope']}/abc.txt"
+        return f"rucio://{SITE_CONFIG['scope']}:abc.txt"
 
     def test_storage_no_overwrite(self, tmp_path: Path) -> None:
         """Test that an error is raised if a file already exists."""
         scope = SITE_CONFIG["scope"]
         file = SITE_CONFIG["file"]
-        obj = self.get_storage_object(tmp_path, query=f"rucio://{scope}/{file}")
+        obj = self.get_storage_object(tmp_path, query=f"rucio://{scope}:{file}")
         with pytest.raises(
-            ValueError, match=f'File "{scope}/{file}" already exists on Rucio'
+            ValueError, match=f'File "{scope}:{file}" already exists on Rucio'
         ):
             obj.store_object()
 
